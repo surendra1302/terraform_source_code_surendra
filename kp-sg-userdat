@@ -1,0 +1,61 @@
+provider "aws" {
+   access_key = "AKIAZPPGAEC7NH52K6QV"
+   secret_key = "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"
+   region = "us-east-1"
+}
+
+resource "aws_security_group" "server_access" {
+    name = "server_access"
+    description = "allows ssh & http access"
+    ingress {
+        from_port = 22
+        to_port = 22
+        protocol = "tcp"
+        cidr_blocks = ["0.0.0.0/0"]
+    }
+
+    ingress {
+        from_port = 80
+        to_port = 80
+        protocol = "tcp"
+        cidr_blocks = ["0.0.0.0/0"]
+    }
+
+    egress {
+        from_port = 0
+        to_port = 0
+        protocol = "-1"
+        cidr_blocks = ["0.0.0.0/0"]
+    }
+  
+}
+
+resource "aws_key_pair" "terraform_kp" {
+  key_name = "terraform_kp"
+  public_key = "${file("terraform_kp.pub")}"
+}
+
+resource "aws_instance" "server1" {
+    ami = "ami-04b4f1a9cf54c11d0"
+    instance_type = "t2.micro"
+    key_name = "terraform_kp"
+    security_groups = ["${aws_security_group.server_access.name}"]
+    user_data = <<-EOF
+        #!/bin/bash
+        sudo apt update -y
+        sudo apt install apache2 -y
+        sudo systemctl start apache2
+        sudo systemctl enable apache2
+        sudo apt install unzip
+        wget https://www.free-css.com/assets/files/free-css-templates/download/page295/sbs.zip
+        unzip sbs.zip
+        sudo su
+        mv sbs-html/* /var/www/html/
+        sudo systemctl restart apache2
+    EOF
+
+    tags = {  
+        Name = "server1"
+    }
+}
+

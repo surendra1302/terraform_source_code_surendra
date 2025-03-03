@@ -1,0 +1,177 @@
+﻿variables.tf
+
+
+# Define the AWS region
+variable "aws_region" {
+  description = "The AWS region to deploy resources"
+  type        = string
+}
+
+
+# Define VPC CIDR block
+variable "vpc_cidr" {
+  description = "CIDR block for the VPC"
+  type        = string
+}
+
+
+# Define Public Subnet CIDR block
+variable "public_subnet_cidr" {
+  description = "CIDR block for the public subnet"
+  type        = string
+}
+
+
+# Define Private Subnet CIDR block
+variable "private_subnet_cidr" {
+  description = "CIDR block for the private subnet"
+  type        = string
+}
+
+
+# Define the instance type
+variable "instance_type" {
+  description = "Type of EC2 instance"
+  type        = string
+}
+
+
+# Define the AMI ID for the EC2 instance
+variable "ami_id" {
+  description = "AMI ID for EC2 instance"
+  type        = string
+}
+
+
+# Define allowed CIDR block for SSH access
+variable "ssh_ingress_cidr" {
+  description = "CIDR block to allow SSH access (0.0.0.0/0 allows all IPs)"
+  type        = string
+}
+
+
+# Define allowed CIDR block for HTTPS access
+variable "https_ingress_cidr" {
+  description = "CIDR block to allow HTTPS access"
+  type        = string
+}
+
+
+
+
+
+
+
+
+
+
+terraform.tfvars
+
+
+aws_region           = "us-east-1"
+vpc_cidr            = "20.0.0.0/16"
+public_subnet_cidr  = "20.0.1.0/24"
+private_subnet_cidr = "20.0.2.0/24"
+instance_type       = "t2.micro"
+ami_id              = "ami-0c55b159cbfafe1f0"  #replace with your ami_id
+ssh_ingress_cidr    = "0.0.0.0/0"
+https_ingress_cidr  = "0.0.0.0/0"
+
+
+
+
+main.tf
+
+
+# Specify the AWS provider and region
+provider "aws" {
+  region = var.aws_region
+}
+
+
+# Create VPC
+resource "aws_vpc" "my_vpc" {
+  cidr_block = var.vpc_cidr
+
+
+  tags = {
+    Name = "MyVPC"
+  }
+}
+
+
+# Create Public Subnet
+resource "aws_subnet" "public_subnet" {
+  vpc_id                  = aws_vpc.my_vpc.id
+  cidr_block              = var.public_subnet_cidr
+  map_public_ip_on_launch = true  # This enables public IP for instances
+
+
+  tags = {
+    Name = "PublicSubnet"
+  }
+}
+
+
+# Create Private Subnet
+resource "aws_subnet" "private_subnet" {
+  vpc_id     = aws_vpc.my_vpc.id
+  cidr_block = var.private_subnet_cidr
+
+
+  tags = {
+    Name = "PrivateSubnet"
+  }
+}
+
+
+# Create Security Group
+resource "aws_security_group" "allow_ssh_https" {
+  vpc_id = aws_vpc.my_vpc.id
+
+
+  # Allow SSH (Port 22)
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = [var.ssh_ingress_cidr]
+  }
+
+
+  # Allow HTTPS (Port 443)
+  ingress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = [var.https_ingress_cidr]
+  }
+
+
+  # Allow all outbound traffic
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+
+  tags = {
+    Name = "AllowSSHAndHTTPS"
+  }
+}
+
+
+# Launch EC2 Instance in Public Subnet
+resource "aws_instance" "my_instance" {
+  ami                    = var.ami_id
+  instance_type          = var.instance_type
+  subnet_id              = aws_subnet.public_subnet.id
+  vpc_security_group_ids = [aws_security_group.allow_ssh_https.id]
+
+
+  tags = {
+    Name = "MyEC2Instance"
+  }
+}
